@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI续写与对话助手</title>
+<style>
+  :root {
+    --primary: #3b82c4;
+    --primary-dark: #2e6da8;
+    --primary-light: #e8f2fb;
+    --green: #4ca888;
+    --green-light: #e7f5ef;
+    --bg: #f3f8fb;
+    --card: #ffffff;
+    --text: #24323d;
+    --muted: #7b8b97;
+    --border: #e1ecf2;
+    --radius: 14px;
+    --shadow: 0 6px 24px rgba(59,130,196,.09);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 28px;
+    background: linear-gradient(120deg, #3b82c4, #4ca888);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(59,130,196,.25);
+  }
+  header .logo {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: rgba(255,255,255,.22);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header .sub { font-size: 12px; opacity: .85; margin-top: 2px; }
+  .container { max-width: 1060px; margin: 20px auto; padding: 0 20px; }
+  .panel {
+    background: var(--card); border-radius: var(--radius);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 20px;
+  }
+  .tabs { display: flex; gap: 10px; margin-bottom: 18px; }
+  .tab {
+    flex: 1; padding: 12px 0; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    background: #eef4f8; color: var(--muted);
+    font-family: inherit; transition: all .18s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .tab.active { background: var(--primary-light); color: var(--primary); box-shadow: inset 0 0 0 2px #bcd9ee; }
+  .tab.green.active { background: var(--green-light); color: var(--green); box-shadow: inset 0 0 0 2px #b4dfd0; }
+  .view { display: none; }
+  .view.active { display: block; }
+  /* 续写 */
+  .write-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 380px; }
+  @media (max-width: 760px) { .write-grid { grid-template-columns: 1fr; } }
+  .col-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+  .col-head .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; }
+  .badge-blue { background: var(--primary-light); color: var(--primary); }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  textarea {
+    width: 100%; min-height: 300px; resize: vertical;
+    border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 14px; font-size: 14px; line-height: 1.8;
+    font-family: inherit; background: #fbfdfe; color: var(--text);
+    transition: border .15s;
+  }
+  textarea:focus { outline: none; border-color: var(--primary); }
+  .result-box {
+    width: 100%; min-height: 300px;
+    border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 14px; font-size: 14px; line-height: 1.9;
+    background: #fbfdfe; white-space: pre-wrap; word-break: break-word;
+    max-height: 560px; overflow-y: auto;
+  }
+  .result-box.placeholder { color: var(--muted); }
+  .write-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; cursor: pointer; font-size: 14px; font-weight: 600;
+    padding: 10px 20px; border-radius: 10px; transition: all .15s; font-family: inherit;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-green:hover { background: #3f9275; }
+  .btn-ghost { background: #fff; color: var(--muted); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .mode-tag { font-size: 12px; color: var(--muted); margin-left: auto; }
+  /* 对话 */
+  .chat-box {
+    border: 1.5px solid var(--border); border-radius: 12px;
+    height: 430px; overflow-y: auto; padding: 16px;
+    background: #fbfdfe; display: flex; flex-direction: column; gap: 12px;
+  }
+  .msg { display: flex; gap: 10px; max-width: 88%; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg .avatar {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .msg.user .avatar { background: var(--primary-light); }
+  .msg.ai .avatar { background: var(--green-light); }
+  .msg .bubble {
+    padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.75;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.user .bubble { background: var(--primary); color: #fff; border-top-right-radius: 4px; }
+  .msg.ai .bubble { background: var(--green-light); color: var(--text); border-top-left-radius: 4px; }
+  .chat-input-row { display: flex; gap: 10px; margin-top: 14px; }
+  .chat-input-row input {
+    flex: 1; padding: 12px 14px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: 14px; font-family: inherit;
+  }
+  .chat-input-row input:focus { outline: none; border-color: var(--green); }
+  .chat-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
+  /* 设置区 */
+  .settings {
+    margin-top: 16px; border: 1.5px dashed var(--border); border-radius: 12px;
+    padding: 14px 16px; background: #f9fbfd;
+  }
+  .settings summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); user-select: none; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px; }
+  @media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-family: inherit;
+  }
+  .field input:focus { outline: none; border-color: var(--primary); }
+  .settings-hint { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #2b3a44; color: #fff; padding: 10px 22px; border-radius: 24px;
+    font-size: 13px; opacity: 0; transition: all .3s; z-index: 999;
+    box-shadow: 0 8px 24px rgba(0,0,0,.2); pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .typing-dots { display: inline-flex; gap: 4px; align-items: center; }
+  .typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 1.2s infinite; }
+  .typing-dots span:nth-child(2) { animation-delay: .2s; }
+  .typing-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,100% { opacity: .2; } 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">✨</div>
+  <div>
+    <h1>AI 续写与对话助手</h1>
+    <div class="sub">续写开头 · 智能对话 · 可接入真实大模型</div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <!-- 模式切换 -->
+    <div class="tabs">
+      <button class="tab active" id="tabWrite">✍️ 续写模式</button>
+      <button class="tab green" id="tabChat">💬 对话模式</button>
+    </div>
+
+    <!-- 续写视图 -->
+    <div class="view active" id="viewWrite">
+      <div class="write-grid">
+        <div>
+          <div class="col-head"><span class="badge badge-blue">📝 输入开头</span></div>
+          <textarea id="writeInput" placeholder="在这里写下故事的开头、文章的引子、文案的开场……例如：&#10;&#10;清晨的第一缕阳光穿过窗帘，我推开窗，眼前是一片……"></textarea>
+        </div>
+        <div>
+          <div class="col-head"><span class="badge badge-green">✨ AI 续写结果</span><span class="mode-tag" id="writeModeTag">演示模式</span></div>
+          <div class="result-box placeholder" id="writeResult">点击下方「开始续写」，AI 将根据你的开头继续往下写两三段。</div>
+        </div>
+      </div>
+      <div class="write-actions">
+        <button class="btn btn-primary" id="btnWrite">🚀 开始续写</button>
+        <button class="btn btn-ghost" id="btnCopyWrite" disabled>📋 一键复制</button>
+        <button class="btn btn-ghost" id="btnClearWrite">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <!-- 对话视图 -->
+    <div class="view" id="viewChat">
+      <div class="chat-box" id="chatBox">
+        <div class="chat-empty" id="chatEmpty">💬 和 AI 打个招呼，开始对话吧～</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="输入你的问题或想法，按 Enter 发送…">
+        <button class="btn btn-green" id="btnSend">发送</button>
+      </div>
+    </div>
+
+    <!-- 设置区 -->
+    <details class="settings" id="settingsPanel">
+      <summary>⚙️ 高级设置：接入真实 AI（可选）</summary>
+      <div class="settings-grid">
+        <div class="field">
+          <label>接口地址（OpenAI 兼容）</label>
+          <input type="text" id="apiBase" value="https://api.openai.com/v1" placeholder="https://api.openai.com/v1">
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input type="password" id="apiKey" placeholder="sk-...（不填则使用演示模式）">
+        </div>
+        <div class="field">
+          <label>模型名称</label>
+          <input type="text" id="apiModel" value="gpt-4o-mini" placeholder="gpt-4o-mini">
+        </div>
+      </div>
+      <div class="settings-hint">🔑 填写 API Key 后会自动调用真实大模型（OpenAI 兼容 /chat/completions 格式）；留空则使用内置演示 AI，完全离线可用、无需任何网络与密钥。</div>
+    </details>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ========== 模式切换 ========== */
+$('tabWrite').addEventListener('click', () => switchView('write'));
+$('tabChat').addEventListener('click', () => switchView('chat'));
+function switchView(v) {
+  const isWrite = v === 'write';
+  $('viewWrite').classList.toggle('active', isWrite);
+  $('viewChat').classList.toggle('active', !isWrite);
+  $('tabWrite').classList.toggle('active', isWrite);
+  $('tabChat').classList.toggle('active', !isWrite);
+}
+
+/* ========== 设置读取 ========== */
+function apiConfig() {
+  return {
+    base: ($('apiBase').value || 'https://api.openai.com/v1').replace(/\/+$/, ''),
+    key: $('apiKey').value.trim(),
+    model: $('apiModel').value.trim() || 'gpt-4o-mini'
+  };
+}
+function isRealMode() { return !!apiConfig().key; }
+function updateModeTag() {
+  $('writeModeTag').textContent = isRealMode() ? '真实 API 模式' : '演示模式';
+}
+['apiBase','apiKey','apiModel'].forEach(id => $(id).addEventListener('input', updateModeTag));
+updateModeTag();
+
+/* ========== 真实 API 调用（OpenAI 兼容） ========== */
+async function callRealAI(messages) {
+  const cfg = apiConfig();
+  const res = await fetch(cfg.base + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({ model: cfg.model, messages, temperature: 0.8 })
+  });
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); msg = j.error && j.error.message ? j.error.message : msg; } catch (e) {}
+    throw new Error('接口调用失败：' + msg);
+  }
+  const j = await res.json();
+  const content = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if (!content) throw new Error('接口返回异常，未获取到内容');
+  return content.trim();
+}
+
+/* ========== 演示续写引擎 ========== */
+function demoContinue(input) {
+  const t = (input || '').trim();
+  const first = t.split(/[。！？!?…\n]/)[0].trim();
+  const tail = (t.split(/[。！？!?…\n]/).filter(s => s.trim()).pop() || first || '这个开头').trim();
+  const topic = tail.length > 12 ? tail.slice(-12) : tail;
+  const p1 = `就这样，${topic}的故事缓缓展开。风从远处吹来，带着熟悉的气息，仿佛在提醒着什么。我站在原地，心中涌起一种说不清的感觉——有些事情，似乎注定要在这一刻发生。`;
+  const p2 = `接下来的日子里，我常常回想起${topic}带给我的触动。那些看似平凡的瞬间，却在不经意间改变了我的轨迹。我开始明白，人生中真正重要的选择，往往就藏在这样不起眼的开端里。于是我不再犹豫，决定顺着内心的方向走下去。`;
+  const p3 = `后来我才懂得，每一个开头都蕴含着无限可能。${topic}只是起点，而真正精彩的部分，还在前方等待着被书写。我深吸一口气，迈出了第一步，心里默默期待：这趟旅程，会遇见怎样的风景呢？`;
+  return `${p1}\n\n${p2}\n\n${p3}`;
+}
+
+/* ========== 续写逻辑 ========== */
+$('btnWrite').addEventListener('click', runWrite);
+$('btnClearWrite').addEventListener('click', () => {
+  $('writeInput').value = '';
+  $('writeResult').textContent = '点击下方「开始续写」，AI 将根据你的开头继续往下写两三段。';
+  $('writeResult').classList.add('placeholder');
+  $('btnCopyWrite').disabled = true;
+});
+$('btnCopyWrite').addEventListener('click', () => {
+  const txt = $('writeResult').textContent;
+  navigator.clipboard.writeText(txt).then(() => toast('✅ 续写结果已复制到剪贴板')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('✅ 续写结果已复制到剪贴板');
+  });
+});
+
+async function runWrite() {
+  const input = $('writeInput').value.trim();
+  if (!input) { toast('⚠️ 请先输入开头文字'); return; }
+  const box = $('writeResult');
+  box.classList.remove('placeholder');
+  box.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span> AI 正在续写…`;
+  $('btnWrite').disabled = true;
+  try {
+    let result;
+    if (isRealMode()) {
+      result = await callRealAI([
+        { role: 'system', content: '你是一位中文写作助手。请根据用户提供的开头文字，自然地续写两三段通顺、有画面感的中文内容，保持语气和风格一致，不要评价用户的开头。' },
+        { role: 'user', content: input }
+      ]);
+    } else {
+      await new Promise(r => setTimeout(r, 700));
+      result = demoContinue(input);
+    }
+    box.textContent = result;
+    $('btnCopyWrite').disabled = false;
+  } catch (err) {
+    box.textContent = '❌ ' + err.message + '\n\n可检查 API Key / 接口地址是否正确，或清空 Key 回到演示模式。';
+  } finally {
+    $('btnWrite').disabled = false;
+  }
+}
+
+/* ========== 对话 ========== */
+const chatHistory = []; // {role: 'user'|'assistant', content}
+let chatBusy = false;
+
+function appendMsg(role, content, typing) {
+  const box = $('chatBox');
+  $('chatEmpty').style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const avatar = role === 'user' ? '🙋' : '🤖';
+  const bubble = typing
+    ? `<span class="typing-dots"><span></span><span></span><span></span></span> AI 正在思考…`
+    : escapeHtml(content).replace(/\n/g, '<br>');
+  div.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${bubble}</div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  return div;
+}
+function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+$('btnSend').addEventListener('click', sendChat);
+$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+async function sendChat() {
+  const text = $('chatInput').value.trim();
+  if (!text || chatBusy) return;
+  $('chatInput').value = '';
+  appendMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  const typingEl = appendMsg('assistant', '', true);
+  chatBusy = true;
+  try {
+    let reply;
+    if (isRealMode()) {
+      const msgs = [
+        { role: 'system', content: '你是一位友善、博学的中文 AI 助手，回答要自然、准确、简洁。' },
+        ...chatHistory.slice(-12)
+      ];
+      reply = await callRealAI(msgs);
+    } else {
+      await new Promise(r => setTimeout(r, 600 + Math.random() * 500));
+      reply = demoReply(text);
+    }
+    chatHistory.push({ role: 'assistant', content: reply });
+    typingEl.querySelector('.bubble').innerHTML = escapeHtml(reply).replace(/\n/g, '<br>');
+  } catch (err) {
+    typingEl.querySelector('.bubble').textContent = '❌ ' + err.message + '\n\n可检查 API Key / 接口地址是否正确，或清空 Key 回到演示模式。';
+  } finally {
+    chatBusy = false;
+    const box = $('chatBox'); box.scrollTop = box.scrollHeight;
+  }
+}
+
+function demoReply(text) {
+  const t = text.trim();
+  if (/^(你好|hi|hello|嗨|哈喽|在吗)/i.test(t)) {
+    return '你好呀！很高兴见到你 👋\n\n我是 AI 续写与对话助手，目前运行在「演示模式」下。你可以：\n· 切换到「续写模式」，给我一个开头，我帮你续写故事或文章；\n· 继续在对话里问我问题，我会尽力给出自然合理的回答。\n\n如果填写了 OpenAI 兼容的 API Key，我还能调用真实大模型，回答会更聪明哦～';
+  }
+  if (/怎么|如何|方法|步骤|教程/.test(t) && /学习|编程|写|做/.test(t)) {
+    return `关于「${t.slice(0, 30)}」，我给你一个实用的思路：\n\n1️⃣ 先明确目标：想清楚最终要达成什么效果，越小越具体越好；\n2️⃣ 拆解步骤：把目标拆成 3-5 个可执行的小步骤，从最简单的开始；\n3️⃣ 边做边查：遇到不懂的地方，带着问题去查资料或问 AI，效率最高；\n4️⃣ 复盘迭代：做完一遍后回头看看哪里能改进，再优化一轮。\n\n需要我针对某一小步展开讲讲吗？`;
+  }
+  if (/为什么|原因|原理/.test(t)) {
+    return `这个问题问得很好。关于「${t.slice(0, 30)}」，通常可以从三个层面理解：\n\n· 表层原因：直接触发这件事的当下因素；\n· 深层原因：长期积累的结构性因素，往往更重要；\n· 环境因素：外部条件如何影响了它的走向。\n\n如果你能告诉我具体想了解哪一方面，我可以给你更精准的解释。`;
+  }
+  if (/介绍|是什么|什么叫|啥是/.test(t)) {
+    return `简单来说，${t.replace(/[介绍是什么什么叫啥是？?。.]/g, '') || '这个问题'}是一个值得深入了解的话题。\n\n它的核心可以概括为三点：一是它的基本定义与本质，二是它主要解决什么问题、用在什么场景，三是它有哪些典型的例子。\n\n你可以告诉我更关注哪个角度，我来展开讲讲。`;
+  }
+  if (/推荐|建议|哪个好|选择/.test(t)) {
+    return `关于「${t.slice(0, 30)}」，我的建议是：\n\n· 先看需求：明确你最在意的核心点（价格、易用性、功能、生态）；\n· 再列候选：挑 2-3 个主流方案对比，不要贪多；\n· 最后试用：有条件的话实际用一下，亲身体验最可靠。\n\n如果你把具体情况告诉我，我可以帮你更细致地对比。`;
+  }
+  if (/感谢|谢谢|多谢/.test(t)) {
+    return '不客气！能帮到你就好 😊 如果还有任何问题，随时告诉我，我们继续聊～';
+  }
+  if (/再见|拜拜|晚安/.test(t)) {
+    return '再见！祝你一切顺利 🌙 需要的时候随时回来找我聊～';
+  }
+  const seed = t.length > 0 ? t : '这个话题';
+  const picks = [
+    `关于「${seed.slice(0, 40)}」，我的看法是：这是一个很有意思的角度。从整体来看，它既有值得肯定的亮点，也存在着一些可以优化的空间。建议你先抓住最核心的那一点入手，往往能起到事半功倍的效果。`,
+    `好的，我理解你想聊「${seed.slice(0, 40)}」。以我目前的理解，可以从几个方面来看：一是背景与现状，二是关键的影响因素，三是未来可能的走向。你觉得最关心哪一个方向？我可以顺着往下深入聊聊。`,
+    `这是个不错的问题！针对「${seed.slice(0, 40)}」，简单说：先想清楚目标，再找到合适的路径，最后用行动验证。过程中如果遇到卡点，拆小问题逐个解决就好。需要我帮你把某个环节再细化吗？`
+  ];
+  return picks[Math.floor(Math.random() * picks.length)];
+}
+
+/* ========== 初始化 ========== */
+$('chatInput').focus();
+</script>
+</body>
+</html>
